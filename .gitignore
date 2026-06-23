@@ -1,0 +1,26 @@
+# Secrets — never commit
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Local API response cache (regenerable; can be large)
+data/cache/
+
+# Intermediate QA drafts (only the verified qa_dataset.csv is tracked)
+data/qa/qa_dataset_DRAFT.*
+
+# Personal working notes — kept local, not part of the published project
+plan.md
+explanation.md
+*.bak
+
+# OS
+.DS_Store
+Thumbs.db

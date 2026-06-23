@@ -1,0 +1,37 @@
+{
+  "hypertension_screening": {
+    "doc_id": "pi-cmqpk3nfh013t01qt7f0a00dh",
+    "title": "Hypertension in Adults: Screening",
+    "pages": 13,
+    "n_nodes": 22,
+    "indexed_at": "2026-06-23T00:20:30"
+  },
+  "colorectal_cancer_screening": {
+    "doc_id": "pi-cmqpkzgs1013v01qt2hifs0cz",
+    "title": "Colorectal Cancer: Screening",
+    "pages": 26,
+    "n_nodes": 33,
+    "indexed_at": "2026-06-23T00:31:15"
+  },
+  "breast_cancer_screening": {
+    "doc_id": "pi-cmqpl02q4013w01qtqe8s30d0",
+    "title": "Breast Cancer: Screening",
+    "pages": 27,
+    "n_nodes": 41,
+    "indexed_at": "2026-06-23T00:31:47"
+  },
+  "depression_suicide_screening": {
+    "doc_id": "pi-cmqpl0ry9013x01qt4iiwi31i",
+    "title": "Depression and Suicide Risk in Adults: Screening",
+    "pages": 21,
+    "n_nodes": 21,
+    "indexed_at": "2026-06-23T00:32:16"
+  },
+  "prediabetes_diabetes_screening": {
+    "doc_id": "pi-cmqpl1djk013y01qtt0t1mtog",
+    "title": "Prediabetes and Type 2 Diabetes: Screening",
+    "pages": 15,
+    "n_nodes": 22,
+    "indexed_at": "2026-06-23T00:32:44"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "exact_match": 0.1667,
+  "token_f1": 0.7403,
+  "fuzzy_match": 0.7746,
+  "list_f1": 0.8315,
+  "retrieval_hit": 0.6667,
+  "retrieval_recall": 0.5833,
+  "judge_score": NaN,
+  "final_correct": 0.8333,
+  "n": 12
+}
