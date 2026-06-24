@@ -1,10 +1,10 @@
-"""Streamlit demo for the PageIndex vectorless-RAG project.
+"""Streamlit demo for the vectorless-RAG-clinical-guidelines project.
 
 Two tabs:
-  - Benchmark report : the precomputed 15-question evaluation (no API calls) — headline
-                       metrics, a pass/fail table, and a per-question drill-down.
-  - Ask a guideline  : pick one of the indexed USPSTF PDFs and ask a question live, with a
-                       running history and the precomputed Q&As for that guideline.
+  - Benchmark report : the precomputed evaluation (no API calls) — headline metrics, a
+                       pass/fail table, a per-question drill-down, and native charts.
+  - Ask a guideline  : pick an indexed USPSTF PDF and ask a question live, with a session
+                       history and the precomputed Q&As for that guideline.
 """
 from __future__ import annotations
 
@@ -22,11 +22,12 @@ sys.path.insert(0, str(ROOT))
 import config  # noqa: E402
 from src import tree_utils  # noqa: E402
 
-st.set_page_config(page_title="PageIndex Vectorless RAG", page_icon="🌲", layout="wide")
+REPO = "vectorless-rag-clinical-guidelines"
+st.set_page_config(page_title=REPO, layout="wide")
 
 
 # ---------------------------------------------------------------------------
-# Data loading (cached — no API calls)
+# Cached data loaders (no API calls)
 # ---------------------------------------------------------------------------
 @st.cache_data
 def load_overall() -> dict:
@@ -51,6 +52,12 @@ def load_results() -> pd.DataFrame:
 
 
 @st.cache_data
+def load_csv(name: str) -> pd.DataFrame:
+    path = config.RESULTS_DIR / name
+    return pd.read_csv(path, index_col=0) if path.exists() else pd.DataFrame()
+
+
+@st.cache_data
 def section_titles(slug: str, node_ids_csv: str) -> list[str]:
     """Map retrieved node ids to '[id] Title' for display."""
     try:
@@ -64,22 +71,21 @@ def section_titles(slug: str, node_ids_csv: str) -> list[str]:
     return out
 
 
-def tick(value) -> str:
-    return "✅" if float(value or 0) == 1.0 else "❌"
+def ground(g: str) -> str:
+    return "—" if g in (None, "none", "") else g
 
-
-GROUND_BADGE = {"vision": "👁 vision", "text": "📄 text", "none": "—"}
-
-st.title("🌲 PageIndex — Vectorless RAG on USPSTF Clinical Guidelines")
-st.caption(
-    "Reasoning-based tree-search retrieval (no embeddings, no vector DB) + Gemini, "
-    "evaluated on long USPSTF screening guidelines."
-)
 
 results = load_results()
 overall = load_overall()
 
-bench_tab, ask_tab = st.tabs(["📊 Benchmark report", "🔎 Ask a guideline"])
+st.title("Vectorless RAG — Clinical Guidelines")
+st.caption(
+    "Reasoning-based tree-search retrieval (no embeddings, no vector database) over long "
+    "USPSTF screening guidelines, with PageIndex for indexing and Gemini for retrieval and "
+    "generation.  ·  github.com/KokateOmkar/" + REPO
+)
+
+bench_tab, ask_tab = st.tabs(["Benchmark report", "Ask a guideline"])
 
 
 # ---------------------------------------------------------------------------
@@ -91,29 +97,29 @@ with bench_tab:
     else:
         n = int(overall.get("n", len(results)))
         n_docs = results["document"].nunique()
-        st.subheader("How well does tree-search retrieval answer clinical questions?")
         st.caption(
             f"Validated end-to-end on **{n} questions** across **{n_docs} guidelines**, entirely "
             "on free-tier APIs. Each question is retrieved, answered, and graded automatically."
         )
 
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Answers correct", f"{overall.get('final_correct', 0) * 100:.0f}%")
-        c2.metric("Right section found", f"{overall.get('retrieval_hit', 0) * 100:.0f}%")
-        c3.metric("Token-F1", f"{overall.get('token_f1', 0):.2f}")
-        c4.metric("Questions", n)
-
-        st.divider()
+        with st.container(border=True):
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("Answers correct", f"{overall.get('final_correct', 0) * 100:.0f}%")
+            c2.metric("Right section found", f"{overall.get('retrieval_hit', 0) * 100:.0f}%")
+            c3.metric("Token-F1", f"{overall.get('token_f1', 0):.2f}")
+            c4.metric("Questions graded", n)
 
         # Filters
-        f1, f2, f3 = st.columns([2, 2, 1])
-        doc_opts = {"All guidelines": "All"}
-        for s in sorted(results["document"].unique()):
-            doc_opts[config.DOCUMENTS.get(s, s)] = s
-        pick_doc = doc_opts[f1.selectbox("Guideline", list(doc_opts), key="f_doc")]
-        types = sorted(results["question_type"].unique())
-        pick_types = f2.multiselect("Question type", types, default=types, key="f_types")
-        only_misses = f3.checkbox("Only misses", value=False, key="f_misses")
+        with st.container(border=True):
+            st.markdown("**Filters**")
+            fc1, fc2, fc3 = st.columns([2, 2, 1])
+            doc_opts = {"All guidelines": "All"}
+            for s in sorted(results["document"].unique()):
+                doc_opts[config.DOCUMENTS.get(s, s)] = s
+            pick_doc = doc_opts[fc1.selectbox("Guideline", list(doc_opts), key="f_doc")]
+            types = sorted(results["question_type"].unique())
+            pick_types = fc2.multiselect("Question type", types, default=types, key="f_types")
+            only_misses = fc3.checkbox("Only misses", value=False, key="f_misses")
 
         view = results.copy()
         if pick_doc != "All":
@@ -132,10 +138,10 @@ with bench_tab:
         table = pd.DataFrame({
             "Question": view["question"].fillna(view["question_id"]),
             "Type": view["question_type"],
-            "Section": view["retrieval_hit"].map(tick),
-            "Answer": view["final_correct"].map(tick),
+            "Section found": view["retrieval_hit"].astype(bool),
+            "Answer correct": view["final_correct"].astype(bool),
             "Token-F1": view["token_f1"].astype(float),
-            "Grounding": view["grounding_mode"].map(lambda g: GROUND_BADGE.get(g, g)),
+            "Grounding": view["grounding_mode"].map(ground),
         })
         st.dataframe(
             table,
@@ -143,50 +149,65 @@ with bench_tab:
             use_container_width=True,
             column_config={
                 "Question": st.column_config.TextColumn(width="large"),
-                "Section": st.column_config.TextColumn("Section ✓", help="Did retrieval find the gold section?"),
-                "Answer": st.column_config.TextColumn("Answer ✓", help="Was the final answer judged correct?"),
+                "Section found": st.column_config.CheckboxColumn(
+                    "Section found", help="Did retrieval find the gold section?", disabled=True),
+                "Answer correct": st.column_config.CheckboxColumn(
+                    "Answer correct", help="Was the final answer judged correct?", disabled=True),
                 "Token-F1": st.column_config.ProgressColumn(format="%.2f", min_value=0.0, max_value=1.0),
             },
         )
 
         # Per-question drill-down
-        st.divider()
-        st.markdown("#### Inspect a question")
-        if len(view):
-            labels = {f"{tick(row.final_correct)}  {row.question or row.question_id}": row.question_id
-                      for row in view.itertuples()}
-            pick = st.selectbox("Pick one", list(labels), key="inspect")
-            row = view[view["question_id"] == labels[pick]].iloc[0]
+        with st.container(border=True):
+            st.markdown("**Inspect a question**")
+            if len(view):
+                labels = {f"{row.question or row.question_id}": row.question_id
+                          for row in view.itertuples()}
+                pick_col, _ = st.columns([3, 2])
+                pick = pick_col.selectbox("Question", list(labels), key="inspect")
+                row = view[view["question_id"] == labels[pick]].iloc[0]
 
-            left, right = st.columns(2)
-            with left:
-                st.markdown(f"**Question** &nbsp; `{row['question_type']}`")
-                st.write(row["question"])
-                st.markdown("**Reference answer**")
-                st.info(row["reference"])
-                st.markdown(f"**Gold section** (page {row.get('gold_page', '?')})")
-                st.write(f"`{row.get('gold_node_id', '?')}` — {row.get('gold_section', '?')}")
-            with right:
-                ok = row["final_correct"] == 1.0
-                st.markdown("**Model answer**")
-                (st.success if ok else st.error)(row["prediction"])
-                st.markdown(f"**Retrieved sections** — {tick(row['retrieval_hit'])} "
-                            f"{'hit' if row['retrieval_hit'] == 1.0 else 'miss'}")
-                for s in section_titles(row["document"], row["retrieved_node_ids"]) or ["(none)"]:
-                    st.write("•", s)
-                meta = (f"grounding: **{GROUND_BADGE.get(row['grounding_mode'], row['grounding_mode'])}** "
-                        f"· token-F1 **{float(row['token_f1']):.2f}** · fuzzy **{float(row['fuzzy_match']):.2f}**")
-                if str(row.get("judge_verdict") or "").strip():
-                    meta += f" · judge: **{row['judge_verdict']}**"
-                st.caption(meta)
+                left, right = st.columns(2)
+                with left:
+                    st.markdown(f"**Question**  ·  `{row['question_type']}`")
+                    st.write(row["question"])
+                    st.markdown("**Reference answer**")
+                    st.info(row["reference"])
+                    st.markdown(f"**Gold section**  ·  page {row.get('gold_page', '?')}")
+                    st.write(f"`{row.get('gold_node_id', '?')}` — {row.get('gold_section', '?')}")
+                with right:
+                    ok = row["final_correct"] == 1.0
+                    st.markdown("**Model answer**")
+                    (st.success if ok else st.error)(row["prediction"])
+                    found = "found" if row["retrieval_hit"] == 1.0 else "not found"
+                    st.markdown(f"**Retrieved sections**  ·  gold section {found}")
+                    for s in section_titles(row["document"], row["retrieved_node_ids"]) or ["(none)"]:
+                        st.write("-", s)
+                    meta = (f"grounding **{ground(row['grounding_mode'])}**  ·  "
+                            f"token-F1 **{float(row['token_f1']):.2f}**  ·  "
+                            f"fuzzy **{float(row['fuzzy_match']):.2f}**")
+                    if str(row.get("judge_verdict") or "").strip():
+                        meta += f"  ·  judge **{row['judge_verdict']}**"
+                    st.caption(meta)
 
-        # Charts
-        st.divider()
-        cols = st.columns(2)
-        for col, fig in zip(cols, ["metrics_by_document.png", "metrics_by_question_type.png"]):
-            p = config.FIGURES_DIR / fig
-            if p.exists():
-                col.image(str(p), use_column_width=True)
+        # Native charts (no image files — always render, never stale)
+        with st.container(border=True):
+            st.markdown("**Performance by category**")
+            metric_map = {"Answer correct": "final_correct",
+                          "Token-F1": "token_f1",
+                          "Right section": "retrieval_hit"}
+            choice = st.radio("Metric", list(metric_map), horizontal=True, key="chart_metric")
+            mcol = metric_map[choice]
+            by_type = load_csv("metrics_by_question_type.csv")
+            by_doc = load_csv("metrics_by_document.csv")
+            ch1, ch2 = st.columns(2)
+            if mcol in by_type:
+                ch1.caption("By question type")
+                ch1.bar_chart(by_type[mcol], height=260)
+            if mcol in by_doc:
+                by_doc = by_doc.rename(index=lambda s: config.DOCUMENTS.get(s, s))
+                ch2.caption("By guideline")
+                ch2.bar_chart(by_doc[mcol], height=260)
 
 
 # ---------------------------------------------------------------------------
@@ -200,67 +221,67 @@ with ask_tab:
         st.stop()
 
     label_to_slug = {config.DOCUMENTS.get(s, s): s for s in indexed}
-    label = st.selectbox("Choose a guideline", list(label_to_slug), key="ask_doc")
-    slug = label_to_slug[label]
 
-    question = st.text_input("Ask a question", placeholder="At what age does screening start?", key="ask_q")
-    k = st.slider("Sections to retrieve (k)", 1, 6, config.RETRIEVAL_TOP_K, key="ask_k")
-    go = st.button("Answer", type="primary", key="ask_go")
-
-    st.caption("Live answering uses the Gemini free tier (~20 requests/day). If it's rate-limited, "
-               "the Benchmark tab shows precomputed results.")
+    with st.container(border=True):
+        top, _ = st.columns([3, 2])
+        label = top.selectbox("Choose a guideline", list(label_to_slug), key="ask_doc")
+        slug = label_to_slug[label]
+        question = st.text_input("Ask a question", placeholder="At what age does screening start?", key="ask_q")
+        opt, btn = st.columns([3, 1])
+        k = opt.slider("Sections to retrieve (k)", 1, 6, config.RETRIEVAL_TOP_K, key="ask_k")
+        go = btn.button("Answer", type="primary", key="ask_go", use_container_width=True)
+        st.caption("Live answering uses the Gemini free tier (~20 requests/day). If it is "
+                   "rate-limited, the precomputed Q&As below and the Benchmark tab still work.")
 
     if go and question.strip():
         from src.generation.answer import answer_question
         from src.llm.gemini_client import QuotaExhausted, TransientError
         try:
-            with st.spinner("Tree-search retrieval + generation…"):
+            with st.spinner("Tree-search retrieval and generation…"):
                 t0 = time.time()
                 res = answer_question(slug, question, k=k)
                 dt = time.time() - t0
             st.session_state.setdefault("history", []).insert(0, {
                 "Guideline": label, "Question": question, "Answer": res.answer,
-                "Grounding": GROUND_BADGE.get(res.grounding_mode, res.grounding_mode),
-                "Confidence": round(res.confidence, 2),
+                "Grounding": ground(res.grounding_mode), "Confidence": round(res.confidence, 2),
             })
-
-            st.markdown("**Answer**")
-            st.success(res.answer)
-            m1, m2, m3 = st.columns(3)
-            m1.metric("Confidence", f"{res.confidence:.2f}")
-            m2.metric("Grounding", GROUND_BADGE.get(res.grounding_mode, res.grounding_mode))
-            m3.metric("Latency", f"{dt:.1f}s")
-            st.markdown("**Retrieved sections**")
-            for r in res.retrieved:
-                with st.expander(f"[{r.node_id}] {r.title} — page {r.page_index} (relevance {r.relevance:.2f})"):
-                    st.caption(r.reason)
-                    snippet = (r.text or "")[:1200]
-                    st.write(snippet + ("…" if len(r.text or "") > 1200 else ""))
+            with st.container(border=True):
+                st.markdown("**Answer**")
+                st.success(res.answer)
+                m1, m2, m3 = st.columns(3)
+                m1.metric("Confidence", f"{res.confidence:.2f}")
+                m2.metric("Grounding", ground(res.grounding_mode))
+                m3.metric("Latency", f"{dt:.1f}s")
+                st.markdown("**Retrieved sections**")
+                for r in res.retrieved:
+                    with st.expander(f"[{r.node_id}] {r.title} — page {r.page_index} "
+                                     f"(relevance {r.relevance:.2f})"):
+                        st.caption(r.reason)
+                        snippet = (r.text or "")[:1200]
+                        st.write(snippet + ("…" if len(r.text or "") > 1200 else ""))
         except (QuotaExhausted, TransientError):
             st.warning("Gemini is rate-limited or busy right now (free tier). Try again later, "
                        "or browse the precomputed results below and in the Benchmark tab.")
 
-    # Session history
     history = st.session_state.get("history", [])
     if history:
-        st.divider()
-        st.markdown("#### This session")
-        st.dataframe(pd.DataFrame(history), hide_index=True, use_container_width=True)
+        with st.container(border=True):
+            st.markdown("**This session**")
+            st.dataframe(pd.DataFrame(history), hide_index=True, use_container_width=True)
 
-    # Precomputed Q&As for the selected guideline (always available, no API)
     if not results.empty:
         doc_rows = results[results["document"] == slug]
-        if len(doc_rows):
-            st.divider()
-            st.markdown(f"#### Precomputed Q&As for *{label}* ({len(doc_rows)})")
-            for row in doc_rows.itertuples():
-                with st.expander(f"{tick(row.final_correct)}  {row.question or row.question_id}"):
-                    st.markdown(f"**Model answer:** {row.prediction}")
-                    st.markdown(f"**Reference:** {row.reference}")
-                    st.caption(f"section retrieved {tick(row.retrieval_hit)} · "
-                               f"grounding {GROUND_BADGE.get(row.grounding_mode, row.grounding_mode)} · "
-                               f"token-F1 {float(row.token_f1):.2f}")
-        else:
-            st.divider()
-            st.caption(f"No precomputed questions for *{label}* yet — free-tier daily limits capped "
-                       "the validated set to colorectal and breast.")
+        with st.container(border=True):
+            if len(doc_rows):
+                st.markdown(f"**Precomputed Q&As for {label}** ({len(doc_rows)})")
+                for row in doc_rows.itertuples():
+                    with st.expander(row.question or row.question_id):
+                        body = f"**Answer:** {row.prediction}"
+                        (st.success if row.final_correct == 1.0 else st.error)(body)
+                        st.markdown(f"**Reference:** {row.reference}")
+                        found = "found" if row.retrieval_hit == 1.0 else "not found"
+                        st.caption(f"gold section {found}  ·  grounding {ground(row.grounding_mode)}"
+                                   f"  ·  token-F1 {float(row.token_f1):.2f}")
+            else:
+                st.caption(f"No precomputed questions for {label} yet — free-tier daily limits "
+                           "capped the validated set to colorectal and breast.")
