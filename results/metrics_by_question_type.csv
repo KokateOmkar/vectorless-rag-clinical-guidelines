@@ -1,5 +1,5 @@
 question_type,exact_match,token_f1,fuzzy_match,list_f1,retrieval_hit,retrieval_recall,judge_score,final_correct,n
-age_band_lookup,0.0,0.8738,0.8935,,1.0,1.0,,1.0,2
+age_band_lookup,0.0,0.7608,0.8034,,0.75,0.5,1.0,1.0,4
 information_extraction,0.3333,0.6389,0.7104,,0.3333,0.3333,,0.6667,3
 list_based,0.3333,0.9279,0.9414,0.8315,0.6667,0.3333,,1.0,3
-numeric_threshold,0.0,0.6089,0.6384,,0.75,0.75,,0.75,4
+numeric_threshold,0.0,0.5371,0.5466,,0.6,0.6,,0.6,5

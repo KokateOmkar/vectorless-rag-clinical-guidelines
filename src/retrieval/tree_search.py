@@ -49,9 +49,9 @@ def search(slug: str, question: str, *, k: int | None = None) -> list[Retrieved]
 
     try:
         raw = gemini_client.generate_json(prompt)
-    except gemini_client.QuotaExhausted:
-        # Don't fabricate an empty retrieval on a quota wall — let the caller halt
-        # cleanly so the question is retried later instead of scored as a wrong "0".
+    except (gemini_client.QuotaExhausted, gemini_client.TransientError):
+        # Don't fabricate an empty retrieval on a quota wall or server hiccup — let the
+        # caller halt cleanly so the question is retried later instead of scored as a "0".
         raise
     except Exception:  # noqa: BLE001 - genuine parse/other error: degrade to no retrieval
         raw = []

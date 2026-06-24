@@ -56,15 +56,23 @@ def _get_client() -> "genai.Client":
 
 
 class QuotaExhausted(Exception):
-    """Raised when a model returns a 429/ResourceExhausted error."""
+    """Raised when a model returns a 429 / ResourceExhausted (daily or rate quota)."""
 
 
-def _is_retryable_error(exc: Exception) -> bool:
-    """True for transient errors worth retrying: quota (429) and server hiccups (500/503)."""
+class TransientError(Exception):
+    """Raised on a server-side hiccup (500/503/overloaded) — worth retrying, but NOT a
+    quota wall, so it must never trigger a model fallback or end a run prematurely."""
+
+
+def _raise_classified(exc: Exception) -> None:
+    """Re-raise a provider error as QuotaExhausted (429) or TransientError (5xx); pass
+    anything else through unchanged."""
     msg = str(exc).lower()
-    keywords = ("429", "quota", "resource exhausted", "rate limit",
-                "500", "503", "unavailable", "overloaded", "internal error")
-    return any(k in msg for k in keywords)
+    if any(k in msg for k in ("429", "quota", "resource exhausted", "rate limit")):
+        raise QuotaExhausted(str(exc)) from exc
+    if any(k in msg for k in ("500", "503", "unavailable", "overloaded", "internal error")):
+        raise TransientError(str(exc)) from exc
+    raise exc
 
 
 # ---------------------------------------------------------------------------
@@ -92,9 +100,9 @@ def _write_cache(path: Path, value: Any) -> None:
 # Public API
 # ---------------------------------------------------------------------------
 @retry(
-    retry=retry_if_exception_type(QuotaExhausted),
+    retry=retry_if_exception_type((QuotaExhausted, TransientError)),
     wait=wait_exponential(multiplier=2, min=4, max=60),
-    stop=stop_after_attempt(4),
+    stop=stop_after_attempt(6),
     reraise=True,
 )
 def _call_model(model_name: str, prompt: str, temperature: float) -> str:
@@ -107,10 +115,8 @@ def _call_model(model_name: str, prompt: str, temperature: float) -> str:
             config=types.GenerateContentConfig(temperature=temperature),
         )
         return resp.text or ""
-    except Exception as exc:  # noqa: BLE001 - normalize quota errors for retry
-        if _is_retryable_error(exc):
-            raise QuotaExhausted(str(exc)) from exc
-        raise
+    except Exception as exc:  # noqa: BLE001 - classify into quota vs transient for retry
+        _raise_classified(exc)
 
 
 def generate(
@@ -132,11 +138,14 @@ def generate(
     try:
         text = _call_model(primary, prompt, temperature)
     except QuotaExhausted:
-        # Primary daily cap hit -> try the fallback model once.
-        if primary != config.GEMINI_FALLBACK_MODEL:
-            text = _call_model(config.GEMINI_FALLBACK_MODEL, prompt, temperature)
+        # Primary daily cap hit -> try the fallback model once (if a distinct one is set).
+        fb = config.GEMINI_FALLBACK_MODEL
+        if fb and fb != primary:
+            text = _call_model(fb, prompt, temperature)
         else:
             raise
+    # TransientError propagates: a 5xx blip is not a quota wall, and the fallback model
+    # may be just as overloaded (or unavailable on free tier).
 
     if use_cache:
         _write_cache(cache_file, text)
@@ -144,9 +153,9 @@ def generate(
 
 
 @retry(
-    retry=retry_if_exception_type(QuotaExhausted),
+    retry=retry_if_exception_type((QuotaExhausted, TransientError)),
     wait=wait_exponential(multiplier=2, min=4, max=60),
-    stop=stop_after_attempt(4),
+    stop=stop_after_attempt(6),
     reraise=True,
 )
 def _call_multimodal(model_name: str, prompt: str, images: list[bytes], mime_type: str, temperature: float) -> str:
@@ -160,10 +169,8 @@ def _call_multimodal(model_name: str, prompt: str, images: list[bytes], mime_typ
             config=types.GenerateContentConfig(temperature=temperature),
         )
         return resp.text or ""
-    except Exception as exc:  # noqa: BLE001
-        if _is_retryable_error(exc):
-            raise QuotaExhausted(str(exc)) from exc
-        raise
+    except Exception as exc:  # noqa: BLE001 - classify into quota vs transient for retry
+        _raise_classified(exc)
 
 
 def generate_multimodal(
@@ -188,10 +195,12 @@ def generate_multimodal(
     try:
         text = _call_multimodal(primary, prompt, images, mime_type, temperature)
     except QuotaExhausted:
-        if primary != config.GEMINI_FALLBACK_MODEL:
-            text = _call_multimodal(config.GEMINI_FALLBACK_MODEL, prompt, images, mime_type, temperature)
+        fb = config.GEMINI_FALLBACK_MODEL
+        if fb and fb != primary:
+            text = _call_multimodal(fb, prompt, images, mime_type, temperature)
         else:
             raise
+    # TransientError propagates (see generate()).
 
     if use_cache:
         _write_cache(cache_file, text)

@@ -20,7 +20,7 @@ import config
 from src.evaluation import judge as judge_mod
 from src.evaluation import metrics
 from src.generation.answer import answer_question
-from src.llm.gemini_client import QuotaExhausted
+from src.llm.gemini_client import QuotaExhausted, TransientError
 
 RAW_PATH = config.RESULTS_DIR / "raw_results.jsonl"
 
@@ -135,13 +135,19 @@ def run(*, limit: int | None = None) -> None:
         for i, row in enumerate(pending, 1):
             try:
                 rec = evaluate_row(row)
-            except QuotaExhausted as exc:
-                # Daily free-tier cap hit. Stop cleanly WITHOUT writing a row for this
-                # question so it is retried (not scored as 0) on the next run.
-                print(f"\n[quota] Daily Gemini quota reached at "
-                      f"{row['question_id']} ({len(done) + i - 1}/{len(qa)} done). "
-                      f"Re-run `python -m src.cli eval` after the quota resets to resume.")
-                print(f"[quota] detail: {str(exc)[:160]}")
+            except (QuotaExhausted, TransientError) as exc:
+                # Stop cleanly WITHOUT writing a row for this question so it is retried
+                # (not scored as 0) on the next run. Distinguish the two causes:
+                #   QuotaExhausted -> daily free-tier cap; wait for reset.
+                #   TransientError -> model overloaded (5xx); just re-run shortly.
+                reached = len(done) + i - 1
+                if isinstance(exc, QuotaExhausted):
+                    print(f"\n[quota] Daily Gemini quota reached at {row['question_id']} "
+                          f"({reached}/{len(qa)} done). Re-run after the quota resets to resume.")
+                else:
+                    print(f"\n[transient] Gemini overloaded (5xx) at {row['question_id']} "
+                          f"({reached}/{len(qa)} done). Re-run `python -m src.cli eval` shortly to resume.")
+                print(f"[detail] {str(exc)[:160]}")
                 halted = True
                 break
             fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
