@@ -169,7 +169,7 @@ src/
   generation/              # hybrid text/vision grounding + answer generation
   evaluation/              # metrics, LLM-judge, eval runner, report charts
   data/validate_qa.py      # QA schema + gold-node validation
-app/streamlit_app.py       # Explore + Benchmark demo
+app/streamlit_app.py       # demo: Benchmark report (pass/fail table + drill-down) + live Ask
 tests/test_metrics.py      # offline unit tests for the scoring functions
 data/                      # pdfs/, pageindex_trees/, qa/, index_manifest.json
 ```
