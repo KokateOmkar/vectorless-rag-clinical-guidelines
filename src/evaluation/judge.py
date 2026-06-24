@@ -55,7 +55,10 @@ def judge(question: str, reference: str, prediction: str) -> Judgment:
         data = gemini_client.generate_json(prompt)
         verdict = str(data.get("verdict", "incorrect")).lower().strip()
         reasoning = str(data.get("reasoning", "")).strip()
-    except Exception as exc:  # noqa: BLE001
+    except (gemini_client.QuotaExhausted, gemini_client.TransientError):
+        # Let the run halt and resume rather than logging a false "incorrect".
+        raise
+    except Exception as exc:  # noqa: BLE001 - bad JSON etc.: treat as an inconclusive judgement
         verdict, reasoning = "incorrect", f"judge error: {exc}"
     if verdict not in _SCORE:
         verdict = "incorrect"

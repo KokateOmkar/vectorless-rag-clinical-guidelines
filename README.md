@@ -66,30 +66,37 @@ flowchart LR
 
 ## Results
 
-> **Status: preliminary.** The numbers below cover a **12-question subset across 2 of the 5
-> guidelines** (colorectal + breast). Google's Gemini free tier currently caps requests at
-> ~20/day, so the full 45-question run is being completed incrementally and these tables are
-> regenerated as it progresses. The harness, metrics, and remaining QA pairs are all in place.
+I ran the pipeline end-to-end entirely on the **free tier**. Gemini's free-tier daily request
+cap (~20/day on `gemini-2.5-flash`, and each question costs several calls) limited the set I
+could validate end-to-end to **15 questions** — colorectal (9/9) and breast (6/9). The full
+45-question benchmark and the harness are included and reproducible; the scores below are the
+questions actually graded.
 
-**Overall (12 questions):**
+**Overall (15 questions):**
 
 | Metric | Score |
 |---|---|
-| Final correct | **0.83** |
-| Token-F1 | 0.74 |
-| Fuzzy match | 0.77 |
+| Final correct | **0.80** |
+| Token-F1 | 0.70 |
+| Fuzzy match | 0.73 |
 | List-Component F1 | 0.83 |
-| Retrieval Hit@k | 0.67 |
-| Exact Match | 0.17 |
+| Retrieval Hit@k | 0.60 |
+| Exact Match | 0.13 |
 
 **By question type:**
 
 | Question type | n | Token-F1 | Retrieval Hit@k | Final correct |
 |---|---|---|---|---|
-| age_band_lookup | 2 | 0.87 | 1.00 | 1.00 |
+| age_band_lookup | 4 | 0.76 | 0.75 | 1.00 |
 | list_based | 3 | 0.93 | 0.67 | 1.00 |
-| numeric_threshold | 4 | 0.61 | 0.75 | 0.75 |
+| numeric_threshold | 5 | 0.54 | 0.60 | 0.60 |
 | information_extraction | 3 | 0.64 | 0.33 | 0.67 |
+
+A few honest reads of these numbers: retrieval Hit@k (0.60) is the main lever — when the
+right section is found, generation is strong (list and age-band questions score 1.0 final
+correctness); `numeric_threshold` is hardest because the exact figure often sits in a table
+cell that retrieval has to land on precisely. Exact Match is low by design — answers are full
+sentences, so token-F1 and the judge are the better correctness signals.
 
 Charts: `results/figures/`. Per-document and per-type CSVs: `results/`. The LLM-judge's
 reasoning for borderline cases is logged to `results/judge_log.jsonl` for transparency.
