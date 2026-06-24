@@ -161,18 +161,17 @@ python -m src.cli ask --doc hypertension_screening \
 ```
 config.py                  # paths, models, free-tier guards
 src/
-  cli.py                   # pages | index | draft-qa | validate-qa | ask | eval | report
+  cli.py                   # pages | index | validate-qa | ask | eval | report
   tree_utils.py            # load/traverse PageIndex trees, attach page text, render outlines
   llm/gemini_client.py     # rate-limit + retry + cache + model fallback (google-genai)
   indexing/                # PageIndex client + tree builder (page-cap guard)
   retrieval/tree_search.py # vectorless tree-search retrieval
   generation/              # hybrid text/vision grounding + answer generation
   evaluation/              # metrics, LLM-judge, eval runner, report charts
-  data/                    # QA drafting + schema validation
+  data/validate_qa.py      # QA schema + gold-node validation
 app/streamlit_app.py       # Explore + Benchmark demo
 tests/test_metrics.py      # offline unit tests for the scoring functions
 data/                      # pdfs/, pageindex_trees/, qa/, index_manifest.json
-docs/architecture.md
 ```
 
 ## Free-tier notes

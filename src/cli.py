@@ -3,7 +3,6 @@
 Usage:
   python -m src.cli pages                 # show PDF page counts vs free-tier cap
   python -m src.cli index [--force]       # index the 5 PDFs with PageIndex
-  python -m src.cli draft-qa [--n 9]      # draft candidate QA pairs to review
   python -m src.cli validate-qa           # validate the verified qa_dataset.csv
   python -m src.cli ask --doc <slug> --q "<question>"
   python -m src.cli eval [--limit N]      # run the evaluation
@@ -25,9 +24,6 @@ def main(argv: list[str] | None = None) -> int:
     p_index = sub.add_parser("index", help="index the PDFs with PageIndex")
     p_index.add_argument("--force", action="store_true", help="re-index even if cached")
     p_index.add_argument("--doc", default=None, help="index only this slug (default: all)")
-
-    p_draft = sub.add_parser("draft-qa", help="draft candidate QA pairs")
-    p_draft.add_argument("--n", type=int, default=9, help="questions per document")
 
     sub.add_parser("validate-qa", help="validate qa_dataset.csv")
 
@@ -61,11 +57,6 @@ def main(argv: list[str] | None = None) -> int:
         else:
             from src.indexing.build_index import index_all
             index_all(force=args.force)
-        return 0
-
-    if args.command == "draft-qa":
-        from src.data.draft_qa import draft_all
-        draft_all(n_per_doc=args.n)
         return 0
 
     if args.command == "validate-qa":

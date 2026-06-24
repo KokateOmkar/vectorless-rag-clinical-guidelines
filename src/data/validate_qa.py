@@ -5,7 +5,12 @@ import csv
 
 import config
 from src import tree_utils
-from src.data.draft_qa import QA_FIELDS
+
+QA_FIELDS = [
+    "question_id", "document", "question", "reference_answer",
+    "gold_node_id", "gold_section", "gold_page", "question_type",
+    "answer_items", "notes",
+]
 
 
 def validate(path=None) -> list[str]:

@@ -27,7 +27,6 @@ FIGURES_DIR = RESULTS_DIR / "figures"
 
 INDEX_MANIFEST = DATA_DIR / "index_manifest.json"
 QA_DATASET_CSV = QA_DIR / "qa_dataset.csv"
-QA_DATASET_DRAFT_CSV = QA_DIR / "qa_dataset_DRAFT.csv"
 
 # Create local-only dirs that aren't guaranteed to exist on a fresh clone.
 for _d in (TREE_DIR, CACHE_DIR, QA_DIR, RESULTS_DIR, FIGURES_DIR):

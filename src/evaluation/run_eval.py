@@ -39,8 +39,7 @@ NUMERIC_METRICS = [
 def _load_qa() -> list[dict[str, Any]]:
     if not config.QA_DATASET_CSV.exists():
         raise FileNotFoundError(
-            f"QA dataset not found at {config.QA_DATASET_CSV}. "
-            "Run `python -m src.cli draft-qa` and verify it first."
+            f"QA dataset not found at {config.QA_DATASET_CSV}."
         )
     with open(config.QA_DATASET_CSV, encoding="utf-8") as fh:
         return list(csv.DictReader(fh))
